@@ -31,9 +31,9 @@ def open_account(username: str, name:str, balance: str):
         psql.execute(query, params)
         psql.disconnect()
 
-        raise HTTPException(status_code=200, detail="OK")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @app.post("/close_account")
@@ -49,7 +49,6 @@ def close_account(username: str, account_id: int):
         psql.execute(query, params)
         psql.disconnect()
 
-        raise HTTPException(status_code=200, detail="OK")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -127,7 +126,6 @@ def add_on_balance(figi: str, username: str, account_id: int, quantity: int):
         psql.execute(query, params)
         psql.disconnect()
 
-        raise HTTPException(status_code=200, detail="OK")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -174,7 +172,7 @@ def get_accounts(username: str):
                     continue
 
                 query = """
-                    SELECT figi, instrument_name_id FROM instruments WHERE id = %s;
+                    SELECT figi, instrument_name_id, name FROM instruments WHERE id = %s;
                 """
                 params = (d[0][1],)
                 i = psql.fetch_data(query, params)
@@ -200,6 +198,9 @@ def get_accounts(username: str):
 
                 pl = current_price * d[0][3] - d[0][4]
                 current_sum_price = current_price * d[0][3]
+                pl_perc = round(100 * pl / d[0][4], 2)
+                if pl_perc < 0:
+                    pl_perc = -pl_perc
 
                 pl_sum += pl
                 current_sum_price_full += current_sum_price
@@ -222,13 +223,14 @@ def get_accounts(username: str):
                     "sum_price": d[0][4],
                     "data": d[0][5],
                     "figi": i[0][0],
+                    "name": i[0][2],
                     "current_price": current_price,
                     "current_sum_price": current_sum_price,
                     "pl": pl,
                     "sing": sing,
                     "pl_str": pl_str,
+                    "pl_perc": pl_perc,
                 })
-
 
             if pl_sum < 0:
                 sing_sum = "-"
@@ -240,6 +242,14 @@ def get_accounts(username: str):
                 sing_sum = ""
                 pl_sum_str = str(pl_sum)
 
+            if account_data[0][1] != account_data[0][2]:
+                pl_perc_sum = round(100 * pl_sum / (account_data[0][1] - account_data[0][2]), 2)
+            else:
+                pl_perc_sum = 0
+
+            if pl_perc_sum < 0:
+                pl_perc_sum = -pl_perc_sum
+
             accounts_mas.append({
                 "id": account_id[0],
                 "name": account_data[0][0],
@@ -249,12 +259,14 @@ def get_accounts(username: str):
                 "sing_sum": sing_sum,
                 "pl_sum_str": pl_sum_str,
                 "current_sum_price_full": current_sum_price_full,
+                "pl_perc_sum": pl_perc_sum,
                 "details": account_details,
             })
 
         psql.disconnect()
         return accounts_mas
     except Exception as e:
+        print (e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
